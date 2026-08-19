@@ -1,0 +1,88 @@
+name: Monitoring stack
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: monitoring-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate shell scripts
+        run: bash -n ops/*.sh
+
+      - name: Validate YAML
+        run: |
+          ruby -e '
+            require "date"
+            require "yaml"
+            Dir.glob("**/*.{yaml,yml}", File::FNM_DOTMATCH).each do |path|
+              next if path.start_with?(".git/")
+              YAML.safe_load(File.read(path), permitted_classes: [Date], aliases: true)
+              puts "valid YAML: #{path}"
+            end
+          '
+
+      - name: Validate dashboard JSON
+        run: python3 -m json.tool config/grafana/dashboards/telescan-overview.json >/dev/null
+
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+
+      - name: Reject local artifacts
+        run: |
+          if find . -type f \( -name '.env' -o -name '._*' -o -name '.DS_Store' \) -print -quit | grep -q .; then
+            echo 'Local artifact or secret file found in repository.' >&2
+            exit 1
+          fi
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          MONITORING_KNOWN_HOSTS: ${{ secrets.MONITORING_KNOWN_HOSTS }}
+          MONITORING_SSH_KEY: ${{ secrets.MONITORING_SSH_KEY }}
+        run: |
+          install -d -m 700 ~/.ssh
+          install -m 600 /dev/null ~/.ssh/monitoring_deploy
+          printf '%s\n' "$MONITORING_SSH_KEY" > ~/.ssh/monitoring_deploy
+          printf '%s\n' "$MONITORING_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Upload configuration
+        env:
+          MONITORING_HOST: ${{ vars.MONITORING_HOST }}
+          MONITORING_USER: ${{ vars.MONITORING_USER }}
+        run: |
+          rsync \
+            --archive \
+            --compress \
+            --delete \
+            --exclude='.git/' \
+            -e 'ssh -i ~/.ssh/monitoring_deploy' \
+            ./ "$MONITORING_USER@$MONITORING_HOST:/home/ubuntu/telescan-monitoring/"
+
+      - name: Deploy and verify
+        env:
+          MONITORING_HOST: ${{ vars.MONITORING_HOST }}
+          MONITORING_USER: ${{ vars.MONITORING_USER }}
+        run: |
+          ssh -i ~/.ssh/monitoring_deploy "$MONITORING_USER@$MONITORING_HOST" \
+            'cd /home/ubuntu/telescan-monitoring && chmod +x ops/*.sh && ./ops/deploy.sh'

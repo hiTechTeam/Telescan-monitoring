@@ -1,0 +1,144 @@
+name: telescan-monitoring
+
+x-security: &default-security
+  restart: unless-stopped
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  grafana:
+    <<: *default-security
+    image: grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b
+    container_name: telescan_grafana
+    user: "472:472"
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_METRICS_ENABLED: "true"
+      GF_LOG_MODE: console
+      GF_LOG_LEVEL: info
+    volumes:
+      - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/grafana:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana-dashboards:ro
+      - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/secrets/grafana_admin_password:/run/secrets/grafana_admin_password:ro
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 512m
+    cpus: 0.50
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - monitoring
+
+  prometheus:
+    <<: *default-security
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    container_name: telescan_prometheus
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=10GB
+      - --web.enable-remote-write-receiver
+      - --web.enable-lifecycle
+    ports:
+      - "${INGEST_BIND_ADDRESS:-127.0.0.1}:9090:9090"
+    volumes:
+      - ./config/prometheus:/etc/prometheus:ro
+      - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/prometheus:/prometheus
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 1g
+    cpus: 0.75
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --spider http://127.0.0.1:9090/-/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - monitoring
+
+  loki:
+    <<: *default-security
+    image: grafana/loki:3.7.6@sha256:efd47c67f9bac88ca29bcf8cb997d9ab29d1848bd0aff579282295542a745952
+    container_name: telescan_loki
+    user: "10001:10001"
+    command:
+      - -config.file=/etc/loki/loki.yaml
+    ports:
+      - "${INGEST_BIND_ADDRESS:-127.0.0.1}:3100:3100"
+    volumes:
+      - ./config/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/loki:/loki
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 1g
+    cpus: 0.75
+    healthcheck:
+      test: ["CMD", "/usr/bin/loki", "-version"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - monitoring
+
+  alloy:
+    <<: *default-security
+    image: grafana/alloy:v1.18.1@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33
+    container_name: telescan_alloy
+    user: "0:0"
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      TELESCAN_ENVIRONMENT: production
+      TELESCAN_HOST: monitoring
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/alloy:/var/lib/alloy
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 512m
+    cpus: 0.50
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge

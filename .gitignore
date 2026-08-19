@@ -1,0 +1,6 @@
+.env
+secrets/
+data/
+*.bak
+.DS_Store
+._*

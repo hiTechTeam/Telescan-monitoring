@@ -1,0 +1,132 @@
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  disable_collectors = ["btrfs", "infiniband", "ipvs", "nfs", "nfsd", "zfs"]
+
+  filesystem {
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+)($|/)"
+    mount_timeout        = "5s"
+  }
+
+  netclass {
+    ignored_devices = "^(veth.*|docker.*|br-.*)$"
+  }
+
+  netdev {
+    device_exclude = "^(veth.*|docker.*|br-.*)$"
+  }
+}
+
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("TELESCAN_ENVIRONMENT")
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = discovery.relabel.host.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.local.receiver]
+}
+
+prometheus.exporter.blackbox "public_endpoints" {
+  config = "{ modules: { http_2xx: { prober: http, timeout: 5s, http: { preferred_ip_protocol: ip4 } }, http_ready: { prober: http, timeout: 5s, http: { preferred_ip_protocol: ip4, fail_if_body_not_matches_regexp: ['\\\"status\\\"\\s*:\\s*\\\"ok\\\"'] } } } }"
+
+  target {
+    name    = "api-ready"
+    address = "https://api.tgtelescan.ru/health/ready"
+    module  = "http_ready"
+    labels  = { service = "api" }
+  }
+
+  target {
+    name    = "eu-relay"
+    address = "https://api.tgtelescan.ru/health/relay"
+    module  = "http_2xx"
+    labels  = { service = "relay" }
+  }
+
+  target {
+    name    = "privacy-page"
+    address = "https://tgtelescan.ru/privacy"
+    module  = "http_2xx"
+    labels  = { service = "public-info" }
+  }
+
+  target {
+    name    = "terms-page"
+    address = "https://tgtelescan.ru/terms"
+    module  = "http_2xx"
+    labels  = { service = "public-info" }
+  }
+}
+
+prometheus.scrape "public_endpoints" {
+  targets         = prometheus.exporter.blackbox.public_endpoints.targets
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.local.receiver]
+}
+
+prometheus.remote_write "local" {
+  endpoint {
+    url = "http://prometheus:9090/api/v1/write"
+  }
+}
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("TELESCAN_ENVIRONMENT")
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  stage.docker {}
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
