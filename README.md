@@ -19,6 +19,8 @@ the host and are never committed to Git.
 - A lightweight Alloy agent on each production host exports host metrics,
   Docker logs, expected-container state, systemd timer results, and WireGuard
   handshake timestamps. Application containers are not modified.
+- Grafana reaches Telegram through a domain-restricted HTTPS proxy on the EU
+  host because the Telegram Bot API is unreachable from the Yandex network.
 
 All container images are pinned by both release tag and immutable SHA-256
 digest in `compose.yaml`.
@@ -59,22 +61,23 @@ Do not copy that file into the repository.
 ## CI/CD
 
 Pull requests and pushes to `main` validate shell, YAML, JSON, and Docker
-Compose syntax. A manual `workflow_dispatch` runs the same validation and then
-deploys through SSH. The repository must define these Actions secrets:
+Compose syntax. After validation succeeds, every push to `main` deploys to the
+central monitoring host through SSH and verifies the running stack. A manual
+`workflow_dispatch` can repeat the same deployment without a new commit.
+
+The `production` GitHub environment defines these Actions secrets:
 
 - `MONITORING_SSH_KEY`
 - `MONITORING_KNOWN_HOSTS`
 
-And these Actions variables:
+The repository defines these Actions variables:
 
 - `MONITORING_HOST`
 - `MONITORING_USER`
 
-The deploy key is independent from an administrator's local SSH key.
-
-Until both Actions secrets are configured, validation runs automatically but
-production deployment remains an explicit administrator operation. Never put
-a private SSH key in the repository.
+The deploy key is independent from an administrator's local SSH key and exists
+only in the GitHub environment secret and the host's `authorized_keys`. Never
+put a private SSH key in the repository.
 
 ## Production agents
 
@@ -112,6 +115,26 @@ cover endpoint failures, missing telemetry, stopped or unhealthy containers,
 inactive timers, failed or stale MongoDB backups, stale WireGuard handshakes,
 and host resource pressure. A notification contact point is intentionally a
 host-side secret and must be configured separately.
+
+The provisioned notification policy routes alerts labeled `service=telescan`
+to the host-managed contact point named `telegram-telescan`. Its Bot API token
+and chat ID are stored only in Grafana's encrypted database on the data disk.
+
+## Telegram egress
+
+The EU host runs Tinyproxy on `10.78.0.3:8888`. It accepts clients only from
+the central monitoring address `10.78.0.1`, permits only HTTPS CONNECT to port
+443, and whitelists only `api.telegram.org`. UFW does not expose the proxy on
+the public interface.
+
+Install or update it on the EU host:
+
+```sh
+sudo ./egress/ops/install.sh
+```
+
+Grafana receives the proxy address through `HTTPS_PROXY`; internal Prometheus,
+Loki, loopback, and monitoring-network traffic is excluded with `NO_PROXY`.
 
 ## Verification
 

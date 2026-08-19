@@ -29,6 +29,10 @@ services:
       GF_METRICS_ENABLED: "true"
       GF_LOG_MODE: console
       GF_LOG_LEVEL: info
+      HTTPS_PROXY: ${TELEGRAM_PROXY_URL:-http://10.78.0.3:8888}
+      NO_PROXY: 127.0.0.1,localhost,prometheus,loki,10.78.0.0/24,grafana.com,.grafana.com
+      https_proxy: ${TELEGRAM_PROXY_URL:-http://10.78.0.3:8888}
+      no_proxy: 127.0.0.1,localhost,prometheus,loki,10.78.0.0/24,grafana.com,.grafana.com
     volumes:
       - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/grafana:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro

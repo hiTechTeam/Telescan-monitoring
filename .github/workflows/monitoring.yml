@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate shell scripts
-        run: bash -n ops/*.sh agent/ops/*.sh network/ops/*.sh
+        run: bash -n ops/*.sh agent/ops/*.sh network/ops/*.sh egress/ops/*.sh
 
       - name: Validate YAML
         run: |
@@ -54,9 +54,12 @@ jobs:
           fi
 
   deploy:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: validate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +85,7 @@ jobs:
             --delete \
             --exclude='.git/' \
             --exclude='.env' \
-            -e 'ssh -i ~/.ssh/monitoring_deploy' \
+            -e 'ssh -o BatchMode=yes -o IdentitiesOnly=yes -i ~/.ssh/monitoring_deploy' \
             ./ "$MONITORING_USER@$MONITORING_HOST:/home/ubuntu/telescan-monitoring/"
 
       - name: Deploy and verify
@@ -90,5 +93,9 @@ jobs:
           MONITORING_HOST: ${{ vars.MONITORING_HOST }}
           MONITORING_USER: ${{ vars.MONITORING_USER }}
         run: |
-          ssh -i ~/.ssh/monitoring_deploy "$MONITORING_USER@$MONITORING_HOST" \
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -i ~/.ssh/monitoring_deploy \
+            "$MONITORING_USER@$MONITORING_HOST" \
             'cd /home/ubuntu/telescan-monitoring && chmod +x ops/*.sh && ./ops/deploy.sh'
