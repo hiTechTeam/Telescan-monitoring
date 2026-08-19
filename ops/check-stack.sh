@@ -22,20 +22,34 @@ fi
 check_url() {
   local name="$1"
   local url="$2"
+  local proxy="${3:-}"
+  local -a curl_args=(
+    --fail
+    --silent
+    --connect-timeout 3
+    --max-time 8
+  )
+
+  if [[ -n "$proxy" ]]; then
+    curl_args+=(--proxy "$proxy")
+  fi
 
   for _ in {1..10}; do
-    if curl --fail --silent --connect-timeout 3 --max-time 5 "$url" >/dev/null 2>&1; then
+    if curl "${curl_args[@]}" "$url" >/dev/null 2>&1; then
       printf '%s readiness check passed.\n' "$name"
       return 0
     fi
     sleep 2
   done
 
-  curl --fail --silent --show-error --connect-timeout 3 --max-time 5 "$url" >/dev/null
+  curl_args+=(--show-error)
+  curl "${curl_args[@]}" "$url" >/dev/null
 }
 
 check_url Grafana http://127.0.0.1:3000/api/health
 check_url Prometheus "http://$ingest_bind_address:9090/-/ready"
 check_url Loki "http://$ingest_bind_address:3100/ready"
+check_url Telegram-egress https://api.telegram.org \
+  "${TELEGRAM_PROXY_URL:-http://10.78.0.3:8888}"
 
 sudo docker compose ps

@@ -19,6 +19,8 @@ the host and are never committed to Git.
 - A lightweight Alloy agent on each production host exports host metrics,
   Docker logs, expected-container state, systemd timer results, and WireGuard
   handshake timestamps. Application containers are not modified.
+- Grafana reaches Telegram through a domain-restricted HTTPS proxy on the EU
+  host because the Telegram Bot API is unreachable from the Yandex network.
 
 All container images are pinned by both release tag and immutable SHA-256
 digest in `compose.yaml`.
@@ -112,6 +114,26 @@ cover endpoint failures, missing telemetry, stopped or unhealthy containers,
 inactive timers, failed or stale MongoDB backups, stale WireGuard handshakes,
 and host resource pressure. A notification contact point is intentionally a
 host-side secret and must be configured separately.
+
+The provisioned notification policy routes alerts labeled `service=telescan`
+to the host-managed contact point named `telegram-telescan`. Its Bot API token
+and chat ID are stored only in Grafana's encrypted database on the data disk.
+
+## Telegram egress
+
+The EU host runs Tinyproxy on `10.78.0.3:8888`. It accepts clients only from
+the central monitoring address `10.78.0.1`, permits only HTTPS CONNECT to port
+443, and whitelists only `api.telegram.org`. UFW does not expose the proxy on
+the public interface.
+
+Install or update it on the EU host:
+
+```sh
+sudo ./egress/ops/install.sh
+```
+
+Grafana receives the proxy address through `HTTPS_PROXY`; internal Prometheus,
+Loki, loopback, and monitoring-network traffic is excluded with `NO_PROXY`.
 
 ## Verification
 
