@@ -1,0 +1,15 @@
+[Unit]
+Description=Export Telescan host operational state
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/telescan-monitoring-state
+User=root
+Group=root
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/telescan-monitoring-agent/textfile

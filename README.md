@@ -12,9 +12,13 @@ the host and are never committed to Git.
 - Prometheus stores metrics for 15 days, capped at 10 GB.
 - Loki stores logs for 7 days.
 - Alloy collects central-host metrics, Docker logs, and external HTTP probes.
-- Grafana, Prometheus, and Loki bind to loopback and are not public services.
-- Production hosts will send telemetry over a dedicated private WireGuard
-  network; their ingestion ports must not be opened to the public internet.
+- Grafana binds to loopback. Prometheus and Loki bind only to the private
+  monitoring interface; none of the three is a public service.
+- Production hosts send telemetry over a dedicated `wg-monitor` WireGuard
+  network. Ingestion ports bind only to `10.78.0.1` and are not public.
+- A lightweight Alloy agent on each production host exports host metrics,
+  Docker logs, expected-container state, systemd timer results, and WireGuard
+  handshake timestamps. Application containers are not modified.
 
 All container images are pinned by both release tag and immutable SHA-256
 digest in `compose.yaml`.
@@ -68,6 +72,47 @@ And these Actions variables:
 
 The deploy key is independent from an administrator's local SSH key.
 
+Until both Actions secrets are configured, validation runs automatically but
+production deployment remains an explicit administrator operation. Never put
+a private SSH key in the repository.
+
+## Production agents
+
+The monitoring network uses addresses documented in `network/README.md`:
+
+- central monitoring: `10.78.0.1`;
+- Moscow origin: `10.78.0.2`;
+- EU relay: `10.78.0.3`.
+
+Install or update an agent from the repository root on the relevant host:
+
+```sh
+sudo ./agent/ops/install.sh \
+  HOST \
+  'EXPECTED_CONTAINERS' \
+  'MONITORED_TIMERS' \
+  'MONITORED_SERVICES' \
+  'MONITORED_WIREGUARD_INTERFACES' \
+  224m
+```
+
+The final argument is the Alloy memory limit. Runtime `.env` files and all
+WireGuard private keys remain host-owned and ignored by Git.
+
+## Dashboards and alerting
+
+Grafana provisions two read-only dashboards:
+
+- `Telescan Overview` for public endpoint status, response times, and logs;
+- `Telescan Infrastructure` for production host, container, timer, backup,
+  disk, memory, CPU, and WireGuard state.
+
+Core alert rules are provisioned from Git and evaluated inside Grafana. They
+cover endpoint failures, missing telemetry, stopped or unhealthy containers,
+inactive timers, failed or stale MongoDB backups, stale WireGuard handshakes,
+and host resource pressure. A notification contact point is intentionally a
+host-side secret and must be configured separately.
+
 ## Verification
 
 Run the idempotent deploy and readiness checks:
@@ -75,6 +120,7 @@ Run the idempotent deploy and readiness checks:
 ```sh
 ./ops/deploy.sh
 ./ops/check-stack.sh
+./ops/check-telemetry.sh
 ```
 
 Expected result: Grafana, Prometheus, and Loki pass readiness; Alloy remains

@@ -1,0 +1,14 @@
+[Interface]
+Address = 10.78.0.1/24
+ListenPort = 51821
+PrivateKey = PRIVATE_KEY_FROM_HOST
+
+[Peer]
+# Moscow origin
+PublicKey = 4YMAtuRsLxrCZBiQGvrAttNlrxxfTPTqSzascrca4EM=
+AllowedIPs = 10.78.0.2/32
+
+[Peer]
+# EU relay
+PublicKey = hbNOLXY8/F5LL12QqBX6UTBBVXzFsa6OukvBCVRYxTw=
+AllowedIPs = 10.78.0.3/32

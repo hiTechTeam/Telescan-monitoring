@@ -1,0 +1,109 @@
+prometheus.exporter.unix "host" {
+  procfs_path = "/host/proc"
+  sysfs_path  = "/host/sys"
+  rootfs_path = "/host/root"
+
+  disable_collectors = ["btrfs", "infiniband", "ipvs", "nfs", "nfsd", "zfs"]
+
+  filesystem {
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+)($|/)"
+    mount_timeout        = "5s"
+  }
+
+  netclass {
+    ignored_devices = "^(veth.*|docker.*|br-.*)$"
+  }
+
+  netdev {
+    device_exclude = "^(veth.*|docker.*|br-.*)$"
+  }
+
+  textfile {
+    directory = "/var/lib/alloy/textfile"
+  }
+}
+
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("TELESCAN_ENVIRONMENT")
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
+
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
+}
+
+prometheus.scrape "host" {
+  targets         = discovery.relabel.host.output
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.central.receiver]
+}
+
+prometheus.remote_write "central" {
+  endpoint {
+    url = sys.env("PROMETHEUS_REMOTE_WRITE_URL")
+  }
+}
+
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "15s"
+}
+
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/telescan_alloy_agent"
+    action        = "drop"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    target_label = "environment"
+    replacement  = sys.env("TELESCAN_ENVIRONMENT")
+  }
+
+  rule {
+    target_label = "host"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  forward_to = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  stage.docker {}
+  forward_to = [loki.write.central.receiver]
+}
+
+loki.write "central" {
+  endpoint {
+    url = sys.env("LOKI_WRITE_URL")
+  }
+}

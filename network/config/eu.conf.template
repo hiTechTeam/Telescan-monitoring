@@ -1,0 +1,10 @@
+[Interface]
+Address = 10.78.0.3/24
+PrivateKey = PRIVATE_KEY_FROM_HOST
+
+[Peer]
+# Central monitoring
+PublicKey = bEObVR7UZvlNP++thARdoz3ILvxgmwChHwQZRKkgIAo=
+Endpoint = 84.201.181.214:51821
+AllowedIPs = 10.78.0.1/32
+PersistentKeepalive = 25

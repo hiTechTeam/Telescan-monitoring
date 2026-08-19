@@ -32,6 +32,11 @@ discovery.relabel "host" {
     target_label = "host"
     replacement  = sys.env("TELESCAN_HOST")
   }
+
+  rule {
+    target_label = "instance"
+    replacement  = sys.env("TELESCAN_HOST")
+  }
 }
 
 prometheus.scrape "host" {

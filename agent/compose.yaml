@@ -1,0 +1,36 @@
+name: telescan-monitoring-agent
+
+services:
+  alloy:
+    image: grafana/alloy:v1.18.1@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33
+    container_name: telescan_alloy_agent
+    restart: unless-stopped
+    user: "0:0"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    environment:
+      TELESCAN_ENVIRONMENT: production
+      TELESCAN_HOST: ${TELESCAN_HOST:?Set TELESCAN_HOST in .env}
+      PROMETHEUS_REMOTE_WRITE_URL: ${PROMETHEUS_REMOTE_WRITE_URL:-http://10.78.0.1:9090/api/v1/write}
+      LOKI_WRITE_URL: ${LOKI_WRITE_URL:-http://10.78.0.1:3100/loki/api/v1/push}
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+      - /var/lib/telescan-monitoring-agent/alloy:/var/lib/alloy
+      - /var/lib/telescan-monitoring-agent/textfile:/var/lib/alloy/textfile:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /run/udev:/run/udev:ro
+      - /:/host/root:ro,rslave
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    mem_limit: ${ALLOY_MEMORY_LIMIT:-224m}
+    cpus: ${ALLOY_CPU_LIMIT:-0.35}

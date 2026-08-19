@@ -1,0 +1,200 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: public-endpoints
+    folder: Telescan
+    interval: 30s
+    rules:
+      - uid: telescan-public-endpoints
+        title: Public endpoint unavailable
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: 1 - probe_success{job=~"integrations/blackbox/(api-ready|eu-relay)"}
+              instant: true
+              intervalMs: 1000
+              legendFormat: "{{job}}"
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions: []
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 2m
+        annotations:
+          description: A public Telescan health endpoint is unavailable or stopped reporting.
+          summary: Public endpoint unavailable
+        labels:
+          severity: critical
+          service: telescan
+        isPaused: false
+
+  - orgId: 1
+    name: production-infrastructure
+    folder: Telescan
+    interval: 30s
+    rules:
+      - uid: telescan-production-health
+        title: Production infrastructure requires attention
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: >-
+                label_replace(
+                  vector(
+                    scalar(absent(node_uname_info{host="monitoring"}) or vector(0)) +
+                    scalar(absent(node_uname_info{host="moscow"}) or vector(0)) +
+                    scalar(absent(node_uname_info{host="eu"}) or vector(0))
+                  ), "check", "telemetry_missing", "", ""
+                )
+                or label_replace(
+                  (1 - telescan_container_running)
+                  and on (host, container, service) (telescan_container_expected == 1),
+                  "check", "container_running", "", ""
+                )
+                or label_replace(
+                  (1 - telescan_container_healthy)
+                  and on (host, container, service) (telescan_container_healthcheck == 1)
+                  and on (host, container, service) (telescan_container_expected == 1),
+                  "check", "container_health", "", ""
+                )
+                or label_replace(
+                  1 - telescan_systemd_timer_active,
+                  "check", "systemd_timer", "", ""
+                )
+                or label_replace(
+                  1 - telescan_systemd_service_success,
+                  "check", "systemd_service", "", ""
+                )
+                or label_replace(
+                  time() - telescan_systemd_service_last_exit_timestamp_seconds{unit="telescan-mongodb-backup.service"} - 108000,
+                  "check", "mongodb_backup_age", "", ""
+                )
+                or label_replace(
+                  time() - telescan_wireguard_latest_handshake_seconds - 300,
+                  "check", "wireguard_handshake", "", ""
+                )
+                or label_replace(
+                  100 * (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) - 85,
+                  "check", "root_disk_usage", "", ""
+                )
+                or label_replace(
+                  100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) - 90,
+                  "check", "memory_usage", "", ""
+                )
+              instant: true
+              intervalMs: 1000
+              legendFormat: "{{check}} {{host}} {{container}} {{unit}} {{interface}}"
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions: []
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: Alerting
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: A production host, container, timer, backup, WireGuard tunnel, disk, or memory check exceeded its safe threshold.
+          summary: Production infrastructure requires attention
+        labels:
+          severity: critical
+          service: telescan
+        isPaused: false

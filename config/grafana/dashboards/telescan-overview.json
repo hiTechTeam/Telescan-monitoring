@@ -70,7 +70,7 @@
       },
       "targets": [
         {
-          "expr": "probe_success{job=\"api-ready\"}",
+          "expr": "probe_success{job=\"integrations/blackbox/api-ready\"}",
           "instant": true,
           "refId": "A"
         }
@@ -140,7 +140,7 @@
       },
       "targets": [
         {
-          "expr": "probe_success{job=\"eu-relay\"}",
+          "expr": "probe_success{job=\"integrations/blackbox/eu-relay\"}",
           "instant": true,
           "refId": "A"
         }

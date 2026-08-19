@@ -125,6 +125,7 @@ services:
       - ${MONITORING_DATA_ROOT:-/var/lib/telescan-monitoring}/alloy:/var/lib/alloy
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
+      - /run/udev:/run/udev:ro
       - /:/host/root:ro,rslave
       - /var/run/docker.sock:/var/run/docker.sock:ro
     tmpfs:
