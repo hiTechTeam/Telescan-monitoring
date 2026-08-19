@@ -61,22 +61,23 @@ Do not copy that file into the repository.
 ## CI/CD
 
 Pull requests and pushes to `main` validate shell, YAML, JSON, and Docker
-Compose syntax. A manual `workflow_dispatch` runs the same validation and then
-deploys through SSH. The repository must define these Actions secrets:
+Compose syntax. After validation succeeds, every push to `main` deploys to the
+central monitoring host through SSH and verifies the running stack. A manual
+`workflow_dispatch` can repeat the same deployment without a new commit.
+
+The `production` GitHub environment defines these Actions secrets:
 
 - `MONITORING_SSH_KEY`
 - `MONITORING_KNOWN_HOSTS`
 
-And these Actions variables:
+The repository defines these Actions variables:
 
 - `MONITORING_HOST`
 - `MONITORING_USER`
 
-The deploy key is independent from an administrator's local SSH key.
-
-Until both Actions secrets are configured, validation runs automatically but
-production deployment remains an explicit administrator operation. Never put
-a private SSH key in the repository.
+The deploy key is independent from an administrator's local SSH key and exists
+only in the GitHub environment secret and the host's `authorized_keys`. Never
+put a private SSH key in the repository.
 
 ## Production agents
 
