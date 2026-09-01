@@ -48,9 +48,12 @@ trap cleanup EXIT
 sudo install -m 0644 "$source_unit" "$destination"
 sudo install -m 0644 "$source_path_unit" "$path_destination"
 sudo systemctl daemon-reload
-sudo systemctl reset-failed \
-  telescan-monitoring-release-recovery.service \
-  telescan-monitoring-release-recovery.path
+for unit in telescan-monitoring-release-recovery.service \
+    telescan-monitoring-release-recovery.path; do
+  if sudo systemctl is-failed --quiet "$unit"; then
+    sudo systemctl reset-failed "$unit"
+  fi
+done
 sudo systemctl enable telescan-monitoring-release-recovery.service
 sudo systemctl enable --now telescan-monitoring-release-recovery.path
 sudo systemctl is-enabled --quiet telescan-monitoring-release-recovery.service
