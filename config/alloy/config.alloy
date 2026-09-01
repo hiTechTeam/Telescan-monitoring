@@ -18,6 +18,10 @@ prometheus.exporter.unix "host" {
   netdev {
     device_exclude = "^(veth.*|docker.*|br-.*)$"
   }
+
+  textfile {
+    directory = "/var/lib/alloy/textfile"
+  }
 }
 
 discovery.relabel "host" {
@@ -79,6 +83,18 @@ prometheus.exporter.blackbox "public_endpoints" {
 
 prometheus.scrape "public_endpoints" {
   targets         = prometheus.exporter.blackbox.public_endpoints.targets
+  scrape_interval = "30s"
+  forward_to      = [prometheus.remote_write.local.receiver]
+}
+
+prometheus.scrape "loki_self" {
+  targets = [{
+    "__address__" = "loki:3100",
+    "environment" = sys.env("TELESCAN_ENVIRONMENT"),
+    "host"        = sys.env("TELESCAN_HOST"),
+    "instance"    = "loki",
+    "service"     = "loki",
+  }]
   scrape_interval = "30s"
   forward_to      = [prometheus.remote_write.local.receiver]
 }

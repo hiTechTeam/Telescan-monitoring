@@ -1,0 +1,11 @@
+services:
+  grafana:
+    restart: "no"
+  prometheus:
+    restart: "no"
+  loki:
+    restart: "no"
+  alloy:
+    restart: "no"
+  restricted-ingest:
+    restart: "no"

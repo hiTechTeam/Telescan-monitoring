@@ -1,0 +1,119 @@
+[
+  {
+    "name": "missing-listener",
+    "role": "monitoring",
+    "base": "valid-monitoring.json",
+    "operation": "remove_listener",
+    "match": {"protocol": "tcp", "address": "10.78.0.1", "port": 13100}
+  },
+  {
+    "name": "missing-container",
+    "role": "monitoring",
+    "base": "valid-monitoring.json",
+    "operation": "remove_container",
+    "match": {"name": "telescan_restricted_ingest"}
+  },
+  {
+    "name": "missing-image",
+    "role": "monitoring",
+    "base": "valid-monitoring.json",
+    "operation": "set_container_field",
+    "match": {"name": "telescan_loki"},
+    "field": "image_id",
+    "value": ""
+  },
+  {
+    "name": "extra-dns",
+    "role": "monitoring",
+    "base": "valid-monitoring.json",
+    "operation": "append_dns",
+    "host": "api.tgtelescan.ru",
+    "value": "203.0.113.99"
+  },
+  {
+    "name": "wrong-image-digest",
+    "role": "monitoring",
+    "base": "valid-monitoring.json",
+    "operation": "set_container_field",
+    "match": {"name": "telescan_prometheus"},
+    "field": "repo_digests",
+    "value": ["prom/prometheus@sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"]
+  },
+  {
+    "name": "wrong-image-identity",
+    "role": "eu",
+    "base": "valid-eu.json",
+    "operation": "set_container_field",
+    "match": {"name": "telescan_relay"},
+    "field": "image_id",
+    "value": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  {
+    "name": "extra-specific-public-listener",
+    "role": "moscow",
+    "base": "valid-moscow.json",
+    "operation": "append_listener",
+    "value": {
+      "protocol": "tcp",
+      "address": "203.0.113.10",
+      "port": 27017
+    }
+  },
+  {
+    "name": "extra-container-specific-public-binding",
+    "role": "moscow",
+    "base": "valid-moscow.json",
+    "operation": "append_container",
+    "value": {
+      "name": "rogue-public-database",
+      "service": "rogue-public-database",
+      "running": true,
+      "image_id": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+      "configured_image": "rogue-public-database:test",
+      "repo_digests": [],
+      "port_bindings": [
+        {
+          "container_port": "27017/tcp",
+          "host_ip": "203.0.113.10",
+          "host_port": "27017"
+        }
+      ]
+    }
+  },
+  {
+    "name": "unexpected-unbound-api-container",
+    "role": "moscow",
+    "base": "valid-moscow.json",
+    "operation": "append_container",
+    "value": {
+      "name": "telescan_api_old",
+      "service": "telescan-api",
+      "running": true,
+      "image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "configured_image": "telescan-api:old",
+      "repo_digests": [],
+      "port_bindings": []
+    }
+  },
+  {
+    "name": "remapped-sensitive-container-port",
+    "role": "moscow",
+    "base": "valid-moscow.json",
+    "operation": "append_container",
+    "value": {
+      "name": "rogue-remapped-database",
+      "service": "rogue-remapped-database",
+      "running": true,
+      "image_id": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+      "configured_image": "rogue-remapped-database:test",
+      "repo_digests": [],
+      "port_bindings": [
+        {
+          "container_port": "27017/tcp",
+          "host_ip": "0.0.0.0",
+          "host_port": "12345"
+        }
+      ]
+    }
+  }
+]

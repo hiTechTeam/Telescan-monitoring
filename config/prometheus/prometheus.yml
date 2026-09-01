@@ -6,6 +6,9 @@ global:
     environment: production
     cluster: telescan
 
+rule_files:
+  - /etc/prometheus/telescan-recording-rules.yml
+
 scrape_configs:
   - job_name: prometheus
     static_configs:

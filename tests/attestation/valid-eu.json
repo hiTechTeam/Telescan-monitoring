@@ -1,0 +1,30 @@
+{
+  "dns": {
+    "api.tgtelescan.ru": ["203.0.113.10"],
+    "tgtelescan.ru": ["203.0.113.20"]
+  },
+  "listeners": [
+    {"protocol": "tcp", "address": "0.0.0.0", "port": 22},
+    {"protocol": "tcp", "address": "0.0.0.0", "port": 80},
+    {"protocol": "tcp", "address": "0.0.0.0", "port": 443},
+    {"protocol": "tcp", "address": "10.78.0.3", "port": 8888},
+    {"protocol": "udp", "address": "0.0.0.0", "port": 51820}
+  ],
+  "containers": [
+    {
+      "name": "telescan_relay", "service": "relay", "running": true,
+      "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "configured_image": "telescan-relay:release", "repo_digests": [],
+      "port_bindings": [
+        {"container_port": "80/tcp", "host_ip": "0.0.0.0", "host_port": "80"},
+        {"container_port": "443/tcp", "host_ip": "0.0.0.0", "host_port": "443"}
+      ]
+    },
+    {
+      "name": "telescan_alloy_agent", "service": "alloy", "running": true,
+      "image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "configured_image": "grafana/alloy:v1.18.1@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33",
+      "repo_digests": ["grafana/alloy@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33"], "port_bindings": []
+    }
+  ]
+}

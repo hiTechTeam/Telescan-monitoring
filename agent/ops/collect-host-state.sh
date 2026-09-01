@@ -17,6 +17,11 @@ fi
 # shellcheck source=/dev/null
 source "$config_file"
 : "${TELESCAN_HOST:?TELESCAN_HOST is required}"
+output_dir="${TELESCAN_MONITORING_STATE_OUTPUT_DIR:-$output_dir}"
+if [[ ! "$output_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  echo "Invalid TELESCAN_MONITORING_STATE_OUTPUT_DIR." >&2
+  exit 1
+fi
 
 install -d -m 0755 "$output_dir"
 tmp_file="$(mktemp "$output_dir/.host-state.XXXXXX")"
@@ -43,6 +48,10 @@ while IFS= read -r container; do
 done < <(docker ps -a --format '{{.Names}}')
 
 {
+  printf '# HELP telescan_monitoring_state_last_success_timestamp_seconds Last successful host-state collection as Unix seconds.\n'
+  printf '# TYPE telescan_monitoring_state_last_success_timestamp_seconds gauge\n'
+  printf 'telescan_monitoring_state_last_success_timestamp_seconds %s\n' "$(date +%s)"
+
   printf '# HELP telescan_container_expected Whether the container is part of the expected production set.\n'
   printf '# TYPE telescan_container_expected gauge\n'
   printf '# HELP telescan_container_running Whether the container is currently running.\n'

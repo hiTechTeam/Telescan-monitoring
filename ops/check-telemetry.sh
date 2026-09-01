@@ -4,23 +4,36 @@ set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 
 ingest_bind_address="${INGEST_BIND_ADDRESS:-}"
-if [[ -z "$ingest_bind_address" && -r .env ]]; then
+require_state_freshness_metrics="${REQUIRE_STATE_FRESHNESS_METRICS:-}"
+if [[ -r .env ]]; then
   while IFS='=' read -r key value; do
-    if [[ "$key" == INGEST_BIND_ADDRESS ]]; then
-      ingest_bind_address="${value%$'\r'}"
-      break
-    fi
+    case "$key" in
+      INGEST_BIND_ADDRESS)
+        [[ -z "$ingest_bind_address" ]] && ingest_bind_address="${value%$'\r'}"
+        ;;
+      REQUIRE_STATE_FRESHNESS_METRICS)
+        [[ -z "$require_state_freshness_metrics" ]] && \
+          require_state_freshness_metrics="${value%$'\r'}"
+        ;;
+    esac
   done <.env
 fi
 ingest_bind_address="${ingest_bind_address:-127.0.0.1}"
+require_state_freshness_metrics="${require_state_freshness_metrics:-false}"
 
 if [[ ! "$ingest_bind_address" =~ ^[0-9A-Fa-f:.]+$ ]]; then
   echo "Invalid INGEST_BIND_ADDRESS: $ingest_bind_address" >&2
   exit 1
 fi
+if [[ "$require_state_freshness_metrics" != true && \
+      "$require_state_freshness_metrics" != false ]]; then
+  echo "REQUIRE_STATE_FRESHNESS_METRICS must be true or false." >&2
+  exit 1
+fi
 
 PROMETHEUS_URL="http://$ingest_bind_address:9090" \
 LOKI_URL="http://$ingest_bind_address:3100" \
+REQUIRE_STATE_FRESHNESS_METRICS="$require_state_freshness_metrics" \
 python3 <<'PY'
 import json
 import os
@@ -30,6 +43,7 @@ import urllib.request
 
 prometheus_url = os.environ["PROMETHEUS_URL"]
 loki_url = os.environ["LOKI_URL"]
+require_state_freshness_metrics = os.environ["REQUIRE_STATE_FRESHNESS_METRICS"] == "true"
 failures = []
 
 
@@ -50,21 +64,15 @@ def query(expression):
     return payload["data"]["result"]
 
 
-def positive_checks(name, expression):
-    rows = query(expression)
-    active = [row for row in rows if float(row["value"][1]) > 0]
-    if active:
-        labels = [row["metric"] for row in active]
-        failures.append(f"{name}: {labels}")
-
-
 probe_rows = query(
-    'probe_success{job=~"integrations/blackbox/(api-ready|eu-relay)"}'
+    'probe_success{job=~"integrations/blackbox/(api-ready|eu-relay|privacy-page|terms-page)"}'
 )
 probe_jobs = {row["metric"].get("job") for row in probe_rows}
 expected_jobs = {
     "integrations/blackbox/api-ready",
     "integrations/blackbox/eu-relay",
+    "integrations/blackbox/privacy-page",
+    "integrations/blackbox/terms-page",
 }
 if probe_jobs != expected_jobs or any(float(row["value"][1]) != 1 for row in probe_rows):
     failures.append(f"public probes: jobs={sorted(probe_jobs)}")
@@ -93,37 +101,28 @@ duplicate_containers = [
 if duplicate_containers:
     failures.append(f"duplicate container metric series: {duplicate_containers}")
 
-positive_checks(
-    "stopped expected containers",
-    "(1 - telescan_container_running) "
-    "and on (host, container, service) (telescan_container_expected == 1)",
-)
-positive_checks(
-    "unhealthy expected containers",
-    "(1 - telescan_container_healthy) "
-    "and on (host, container, service) (telescan_container_healthcheck == 1) "
-    "and on (host, container, service) (telescan_container_expected == 1)",
-)
-positive_checks("inactive timers", "1 - telescan_systemd_timer_active")
-positive_checks("failed monitored services", "1 - telescan_systemd_service_success")
-positive_checks(
-    "stale MongoDB backup",
-    "time() - telescan_systemd_service_last_exit_timestamp_seconds"
-    '{unit="telescan-mongodb-backup.service"} - 108000',
-)
-positive_checks(
-    "stale WireGuard handshakes",
-    "time() - telescan_wireguard_latest_handshake_seconds - 300",
-)
-positive_checks(
-    "root disk above 85 percent",
-    "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / "
-    "node_filesystem_size_bytes{mountpoint=\"/\"}) - 85",
-)
-positive_checks(
-    "memory above 90 percent",
-    "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) - 90",
-)
+problem_rows = query("telescan:production_problem")
+if not any(row["metric"].get("check") == "healthy_sentinel" for row in problem_rows):
+    failures.append("production recording rule is missing its healthy sentinel")
+active_problems = [
+    row
+    for row in problem_rows
+    if row["metric"].get("check") != "healthy_sentinel"
+    and float(row["value"][1]) > 0
+]
+if active_problems:
+    failures.append(
+        "production health checks: "
+        + repr([row["metric"] for row in active_problems])
+    )
+
+if require_state_freshness_metrics:
+    state_rows = query(
+        "max by (host) (telescan_monitoring_state_last_success_timestamp_seconds)"
+    )
+    state_hosts = {row["metric"].get("host") for row in state_rows}
+    if state_hosts != expected_hosts:
+        failures.append(f"state freshness metrics: hosts={sorted(state_hosts)}")
 
 loki_payload = get_json(f"{loki_url}/loki/api/v1/label/host/values")
 log_hosts = set(loki_payload.get("data", []))
@@ -138,5 +137,9 @@ if failures:
 print(f"Public probes healthy: {', '.join(sorted(probe_jobs))}")
 print(f"Metric hosts present: {', '.join(sorted(hosts))}")
 print(f"Log hosts present: {', '.join(sorted(log_hosts))}")
+if require_state_freshness_metrics:
+    print("State freshness coverage is required and present for every host.")
+else:
+    print("State freshness coverage is in staged mode; set REQUIRE_STATE_FRESHNESS_METRICS=true after all agents are updated.")
 print("Production telemetry checks passed.")
 PY

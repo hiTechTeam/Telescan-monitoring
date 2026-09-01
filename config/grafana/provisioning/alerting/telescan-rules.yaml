@@ -11,7 +11,7 @@ policies:
       - receiver: telegram-telescan
         object_matchers:
           - [service, =, telescan]
-        group_by: [alertname, host, check]
+        group_by: [alertname, host, check, drill_id]
         group_wait: 30s
         group_interval: 5m
         repeat_interval: 1h
@@ -37,7 +37,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: 1 - probe_success{job=~"integrations/blackbox/(api-ready|eu-relay)"}
+              expr: 1 - probe_success{job=~"integrations/blackbox/(api-ready|eu-relay|privacy-page|terms-page)"}
               instant: true
               intervalMs: 1000
               legendFormat: "{{job}}"
@@ -115,49 +115,7 @@ groups:
                 type: prometheus
                 uid: prometheus
               editorMode: code
-              expr: >-
-                label_replace(
-                  vector(
-                    scalar(absent(node_uname_info{host="monitoring"}) or vector(0)) +
-                    scalar(absent(node_uname_info{host="moscow"}) or vector(0)) +
-                    scalar(absent(node_uname_info{host="eu"}) or vector(0))
-                  ), "check", "telemetry_missing", "", ""
-                )
-                or label_replace(
-                  (1 - telescan_container_running)
-                  and on (host, container, service) (telescan_container_expected == 1),
-                  "check", "container_running", "", ""
-                )
-                or label_replace(
-                  (1 - telescan_container_healthy)
-                  and on (host, container, service) (telescan_container_healthcheck == 1)
-                  and on (host, container, service) (telescan_container_expected == 1),
-                  "check", "container_health", "", ""
-                )
-                or label_replace(
-                  1 - telescan_systemd_timer_active,
-                  "check", "systemd_timer", "", ""
-                )
-                or label_replace(
-                  1 - telescan_systemd_service_success,
-                  "check", "systemd_service", "", ""
-                )
-                or label_replace(
-                  time() - telescan_systemd_service_last_exit_timestamp_seconds{unit="telescan-mongodb-backup.service"} - 108000,
-                  "check", "mongodb_backup_age", "", ""
-                )
-                or label_replace(
-                  time() - telescan_wireguard_latest_handshake_seconds - 300,
-                  "check", "wireguard_handshake", "", ""
-                )
-                or label_replace(
-                  100 * (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) - 85,
-                  "check", "root_disk_usage", "", ""
-                )
-                or label_replace(
-                  100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) - 90,
-                  "check", "memory_usage", "", ""
-                )
+              expr: telescan:production_problem
               instant: true
               intervalMs: 1000
               legendFormat: "{{check}} {{host}} {{container}} {{unit}} {{interface}}"
@@ -208,9 +166,88 @@ groups:
         execErrState: Error
         for: 5m
         annotations:
-          description: A production host, container, timer, backup, WireGuard tunnel, disk, or memory check exceeded its safe threshold.
+          description: A production host, container, timer, backup, WireGuard tunnel, collector, storage, Loki growth, or capacity check exceeded its safe threshold.
           summary: Production infrastructure requires attention
         labels:
           severity: critical
           service: telescan
+        isPaused: false
+
+  - orgId: 1
+    name: notification-delivery-drill
+    folder: Telescan
+    interval: 10s
+    rules:
+      - uid: telescan-notification-delivery-drill
+        title: Telescan notification delivery drill
+        condition: C
+        data:
+          - refId: A
+            queryType: ""
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              editorMode: code
+              expr: telescan_telegram_delivery_drill == 1
+              instant: true
+              intervalMs: 1000
+              legendFormat: "{{drill_id}}"
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions: []
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: [0]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [C]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              refId: C
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          description: "Operator drill {{ $labels.drill_id }} is exercising Grafana, the notification policy, the restricted EU proxy, and Telegram delivery."
+          summary: "Telescan notification delivery drill {{ $labels.drill_id }}"
+        labels:
+          drill: "true"
+          service: telescan
+          severity: info
         isPaused: false

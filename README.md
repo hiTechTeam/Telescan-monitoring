@@ -13,7 +13,9 @@ the host and are never committed to Git.
 - Loki stores logs for 7 days.
 - Alloy collects central-host metrics, Docker logs, and external HTTP probes.
 - Grafana binds to loopback. Prometheus and Loki bind only to the private
-  monitoring interface; none of the three is a public service.
+  monitoring interface during the staged migration and then to loopback; none
+  of the three is a public service. The target remote-write path is an
+  allow-listed nginx gateway exposing only the two exact write endpoints.
 - Production hosts send telemetry over a dedicated `wg-monitor` WireGuard
   network. Ingestion ports bind only to `10.78.0.1` and are not public.
 - A lightweight Alloy agent on each production host exports host metrics,
@@ -40,6 +42,13 @@ sudo ./ops/bootstrap-docker.sh
 
 `bootstrap-storage.sh` intentionally refuses to format a mounted disk, a disk
 with an existing filesystem or signature, or a disk smaller than 60 GiB.
+Before enabling CI rollout, install the boot and online release-recovery units
+from an interactive maintenance session:
+
+```sh
+bash ops/install-release-recovery.sh \
+  --apply --confirm APPLY_MONITORING_RELEASE_RECOVERY_UNIT
+```
 
 ## Access Grafana
 
@@ -60,10 +69,18 @@ Do not copy that file into the repository.
 
 ## CI/CD
 
-Pull requests and pushes to `main` validate shell, YAML, JSON, and Docker
-Compose syntax. After validation succeeds, every push to `main` deploys to the
-central monitoring host through SSH and verifies the running stack. A manual
-`workflow_dispatch` can repeat the same deployment without a new commit.
+Pull requests and pushes to `main` validate shell, YAML, JSON, Docker Compose,
+Prometheus rules, restricted-ingress nginx, and both Alloy configurations.
+After validation succeeds, every push to `main` streams the release to the
+central host only after the host production lock is held. The remote transaction
+creates a fully-fsynced immutable release and old/new image manifests, protects
+all previous images, and promotes one atomic `current` pointer. Candidate
+containers use `restart: no` until full stack and production telemetry checks
+pass and the commit is durable. Failure restores the previous pointer/image set
+and performs a bounded full-health check; an online path watcher recovers even
+if the outer SSH session disappears. A manual `workflow_dispatch` can repeat
+the same deployment without a new commit. See
+`runbooks/transactional-deploy.md`.
 
 The `production` GitHub environment defines these Actions secrets:
 
@@ -99,8 +116,10 @@ sudo ./agent/ops/install.sh \
   224m
 ```
 
-The final argument is the Alloy memory limit. Runtime `.env` files and all
-WireGuard private keys remain host-owned and ignored by Git.
+The sixth argument is the Alloy memory limit. An optional seventh argument is
+`legacy` or `restricted`; use only the staged procedure in
+`runbooks/restricted-ingest-migration.md` to change it. Runtime `.env` files and
+all WireGuard private keys remain host-owned and ignored by Git.
 
 ## Dashboards and alerting
 
@@ -113,12 +132,19 @@ Grafana provisions two read-only dashboards:
 Core alert rules are provisioned from Git and evaluated inside Grafana. They
 cover endpoint failures, missing telemetry, stopped or unhealthy containers,
 inactive timers, failed or stale MongoDB backups, stale WireGuard handshakes,
-and host resource pressure. A notification contact point is intentionally a
-host-side secret and must be configured separately.
+state-collector freshness, the monitoring data disk and inodes, Loki ingestion
+growth, and host resource pressure. The missing-host recording rule has unit
+cases for all, one, two, and all three hosts missing. A notification contact
+point is intentionally a host-side secret and must be configured separately.
 
 The provisioned notification policy routes alerts labeled `service=telescan`
 to the host-managed contact point named `telegram-telescan`. Its Bot API token
 and chat ID are stored only in Grafana's encrypted database on the data disk.
+
+Use `runbooks/telegram-delivery-drill.md` for a verifiable firing/resolved
+delivery test. Grafana secret-key adoption is opt-in and guarded by
+`runbooks/grafana-secret-key-migration.md`; never enable its Compose override
+directly against an existing database.
 
 ## Telegram egress
 
@@ -149,3 +175,7 @@ Run the idempotent deploy and readiness checks:
 Expected result: Grafana, Prometheus, and Loki pass readiness; Alloy remains
 running; all central targets show `up = 1`; external probes show
 `probe_success = 1`; and Docker logs are queryable in Loki.
+
+Operational rollout and evidence procedures live under `runbooks/`, including
+state freshness, restricted ingestion, Telegram delivery, Grafana encryption,
+and three-host read-only production attestation.

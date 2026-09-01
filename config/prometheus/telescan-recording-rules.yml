@@ -1,0 +1,95 @@
+groups:
+  - name: telescan-production-health
+    interval: 30s
+    rules:
+      - record: telescan:production_problem
+        expr: |
+          label_replace(
+            absent(node_uname_info{host="monitoring"}),
+            "check", "telemetry_missing", "", ""
+          )
+          or label_replace(
+            absent(node_uname_info{host="moscow"}),
+            "check", "telemetry_missing", "", ""
+          )
+          or label_replace(
+            absent(node_uname_info{host="eu"}),
+            "check", "telemetry_missing", "", ""
+          )
+          or label_replace(
+            (1 - telescan_container_running)
+            and on (host, container, service) (telescan_container_expected == 1),
+            "check", "container_running", "", ""
+          )
+          or label_replace(
+            (1 - telescan_container_healthy)
+            and on (host, container, service) (telescan_container_healthcheck == 1)
+            and on (host, container, service) (telescan_container_expected == 1),
+            "check", "container_health", "", ""
+          )
+          or label_replace(
+            1 - telescan_systemd_timer_active,
+            "check", "systemd_timer", "", ""
+          )
+          or label_replace(
+            1 - telescan_systemd_service_success,
+            "check", "systemd_service", "", ""
+          )
+          or label_replace(
+            time() - telescan_systemd_service_last_exit_timestamp_seconds{unit="telescan-mongodb-backup.service"} - 108000,
+            "check", "mongodb_backup_age", "", ""
+          )
+          or label_replace(
+            time() - telescan_wireguard_latest_handshake_seconds - 300,
+            "check", "wireguard_handshake", "", ""
+          )
+          or label_replace(
+            time() - telescan_monitoring_state_last_success_timestamp_seconds - 180,
+            "check", "state_collector_age", "", ""
+          )
+          or label_replace(
+            absent(telescan_monitoring_state_last_success_timestamp_seconds{host="monitoring"})
+              and on () (telescan_state_freshness_enforcement == 1),
+            "check", "state_collector_missing", "", ""
+          )
+          or label_replace(
+            absent(telescan_monitoring_state_last_success_timestamp_seconds{host="moscow"})
+              and on () (telescan_state_freshness_enforcement == 1),
+            "check", "state_collector_missing", "", ""
+          )
+          or label_replace(
+            absent(telescan_monitoring_state_last_success_timestamp_seconds{host="eu"})
+              and on () (telescan_state_freshness_enforcement == 1),
+            "check", "state_collector_missing", "", ""
+          )
+          or label_replace(
+            100 * (1 - node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) - 85,
+            "check", "root_disk_usage", "", ""
+          )
+          or label_replace(
+            absent(node_filesystem_size_bytes{host="monitoring",mountpoint="/var/lib/telescan-monitoring"}),
+            "check", "monitoring_data_disk_missing", "", ""
+          )
+          or label_replace(
+            100 * (1 - node_filesystem_avail_bytes{host="monitoring",mountpoint="/var/lib/telescan-monitoring"}
+              / node_filesystem_size_bytes{host="monitoring",mountpoint="/var/lib/telescan-monitoring"}) - 85,
+            "check", "monitoring_data_disk_usage", "", ""
+          )
+          or label_replace(
+            100 * (1 - node_filesystem_files_free{host="monitoring",mountpoint="/var/lib/telescan-monitoring"}
+              / node_filesystem_files{host="monitoring",mountpoint="/var/lib/telescan-monitoring"}) - 85,
+            "check", "monitoring_data_disk_inodes", "", ""
+          )
+          or label_replace(
+            sum(rate(loki_distributor_bytes_received_total[5m])) - 1048576,
+            "check", "loki_ingestion_bytes_per_second", "", ""
+          )
+          or label_replace(
+            absent(loki_distributor_bytes_received_total),
+            "check", "loki_ingestion_metric_missing", "", ""
+          )
+          or label_replace(
+            100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) - 90,
+            "check", "memory_usage", "", ""
+          )
+          or label_replace(vector(0), "check", "healthy_sentinel", "", "")

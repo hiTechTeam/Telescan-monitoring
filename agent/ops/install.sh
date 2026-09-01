@@ -6,8 +6,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
-if [[ $# -lt 5 || $# -gt 6 ]]; then
-  echo "Usage: $0 HOST EXPECTED_CONTAINERS MONITORED_TIMERS MONITORED_SERVICES MONITORED_WIREGUARD_INTERFACES [MEMORY_LIMIT]" >&2
+if [[ $# -lt 5 || $# -gt 7 ]]; then
+  echo "Usage: $0 HOST EXPECTED_CONTAINERS MONITORED_TIMERS MONITORED_SERVICES MONITORED_WIREGUARD_INTERFACES [MEMORY_LIMIT] [legacy|restricted]" >&2
   exit 2
 fi
 
@@ -17,6 +17,7 @@ monitored_timers="$3"
 monitored_services="$4"
 monitored_wireguard_interfaces="$5"
 memory_limit="${6:-224m}"
+ingest_mode="${7:-legacy}"
 repo_dir="$(cd "$(dirname "$0")/.." && pwd)"
 data_root=/var/lib/telescan-monitoring-agent
 
@@ -28,6 +29,19 @@ fi
 if [[ ! "$memory_limit" =~ ^[0-9]+[mMgG]$ ]]; then
   echo "Invalid memory limit: $memory_limit" >&2
   exit 2
+fi
+if [[ "$ingest_mode" != legacy && "$ingest_mode" != restricted ]]; then
+  echo "Ingest mode must be legacy or restricted." >&2
+  exit 2
+fi
+
+if [[ "$ingest_mode" == restricted ]]; then
+  "$repo_dir/ops/check-restricted-ingest.sh"
+  prometheus_remote_write_url=http://10.78.0.1:19090/api/v1/write
+  loki_write_url=http://10.78.0.1:13100/loki/api/v1/push
+else
+  prometheus_remote_write_url=http://10.78.0.1:9090/api/v1/write
+  loki_write_url=http://10.78.0.1:3100/loki/api/v1/push
 fi
 
 install -d -m 0755 "$data_root/alloy/data" "$data_root/textfile"
@@ -48,8 +62,8 @@ install -m 0644 "$tmp_config" "$config_file"
 tmp_environment="$(mktemp)"
 {
   printf 'TELESCAN_HOST=%s\n' "$host"
-  printf 'PROMETHEUS_REMOTE_WRITE_URL=http://10.78.0.1:9090/api/v1/write\n'
-  printf 'LOKI_WRITE_URL=http://10.78.0.1:3100/loki/api/v1/push\n'
+  printf 'PROMETHEUS_REMOTE_WRITE_URL=%s\n' "$prometheus_remote_write_url"
+  printf 'LOKI_WRITE_URL=%s\n' "$loki_write_url"
   printf 'ALLOY_MEMORY_LIMIT=%s\n' "$memory_limit"
   printf 'ALLOY_CPU_LIMIT=0.35\n'
 } >"$tmp_environment"

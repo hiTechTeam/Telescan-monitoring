@@ -1,0 +1,157 @@
+rule_files:
+  - ../config/prometheus/telescan-recording-rules.yml
+
+evaluation_interval: 30s
+
+tests:
+  - name: all production hosts present
+    interval: 30s
+    input_series:
+      - series: 'telescan_state_freshness_enforcement'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="monitoring"}'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="moscow"}'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="eu"}'
+        values: '1 1 1'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="telemetry_missing"}'
+        eval_time: 1m
+        exp_samples: []
+
+  - name: one production host missing
+    interval: 30s
+    input_series:
+      - series: 'telescan_state_freshness_enforcement'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="monitoring"}'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="moscow"}'
+        values: '1 1 1'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="telemetry_missing"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="eu"}'
+            value: 1
+
+  - name: two production hosts missing
+    interval: 30s
+    input_series:
+      - series: 'telescan_state_freshness_enforcement'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="monitoring"}'
+        values: '1 1 1'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="telemetry_missing"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="eu"}'
+            value: 1
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="moscow"}'
+            value: 1
+
+  - name: all production hosts missing
+    interval: 30s
+    input_series:
+      - series: 'telescan_state_freshness_enforcement'
+        values: '1 1 1'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="telemetry_missing"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="eu"}'
+            value: 1
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="monitoring"}'
+            value: 1
+          - labels: 'telescan:production_problem{check="telemetry_missing",host="moscow"}'
+            value: 1
+
+  - name: freshness missing enforcement disabled during staged rollout
+    interval: 30s
+    input_series:
+      - series: 'telescan_state_freshness_enforcement'
+        values: '0 0 0'
+      - series: 'node_uname_info{host="monitoring"}'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="moscow"}'
+        values: '1 1 1'
+      - series: 'node_uname_info{host="eu"}'
+        values: '1 1 1'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="state_collector_missing"}'
+        eval_time: 1m
+        exp_samples: []
+
+  - name: stale backup and state collector are positive
+    interval: 30s
+    input_series:
+      - series: 'telescan_systemd_service_last_exit_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.service"}'
+        values: '-108001 -108001 -108001'
+      - series: 'telescan_monitoring_state_last_success_timestamp_seconds{host="eu"}'
+        values: '-121 -121 -121'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="mongodb_backup_age"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="mongodb_backup_age",host="moscow",unit="telescan-mongodb-backup.service"}'
+            value: 61
+      - expr: 'telescan:production_problem{check="state_collector_age"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="state_collector_age",host="eu"}'
+            value: 1
+
+  - name: monitoring data disk missing is positive
+    interval: 30s
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="monitoring_data_disk_missing"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="monitoring_data_disk_missing",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+            value: 1
+
+  - name: monitoring data disk usage and inode pressure are positive
+    interval: 30s
+    input_series:
+      - series: 'node_filesystem_size_bytes{device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+        values: '100 100 100'
+      - series: 'node_filesystem_avail_bytes{device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+        values: '10 10 10'
+      - series: 'node_filesystem_files{device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+        values: '100 100 100'
+      - series: 'node_filesystem_files_free{device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+        values: '10 10 10'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="monitoring_data_disk_usage"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="monitoring_data_disk_usage",device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+            value: 5
+      - expr: 'telescan:production_problem{check="monitoring_data_disk_inodes"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="monitoring_data_disk_inodes",device="/dev/vdb",host="monitoring",mountpoint="/var/lib/telescan-monitoring"}'
+            value: 5
+
+  - name: Loki ingestion metric missing is positive
+    interval: 30s
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="loki_ingestion_metric_missing"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="loki_ingestion_metric_missing"}'
+            value: 1
+
+  - name: Loki ingestion growth is positive
+    interval: 30s
+    input_series:
+      - series: 'loki_distributor_bytes_received_total{host="monitoring",tenant="fake"}'
+        values: '0 314572800 629145600'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="loki_ingestion_bytes_per_second"}'
+        eval_time: 1m
+        exp_samples:
+          - labels: 'telescan:production_problem{check="loki_ingestion_bytes_per_second"}'
+            value: 1048576

@@ -1,0 +1,65 @@
+{
+  "dns": {
+    "api.tgtelescan.ru": ["203.0.113.10"],
+    "tgtelescan.ru": ["203.0.113.20"]
+  },
+  "listeners": [
+    {"protocol": "tcp", "address": "0.0.0.0", "port": 22},
+    {"protocol": "tcp", "address": "127.0.0.1", "port": 3000},
+    {"protocol": "tcp", "address": "127.0.0.1", "port": 9090},
+    {"protocol": "tcp", "address": "127.0.0.1", "port": 3100},
+    {"protocol": "tcp", "address": "10.78.0.1", "port": 19090},
+    {"protocol": "tcp", "address": "10.78.0.1", "port": 13100},
+    {"protocol": "udp", "address": "0.0.0.0", "port": 51821}
+  ],
+  "containers": [
+    {
+      "name": "telescan_grafana",
+      "service": "grafana",
+      "running": true,
+      "image_id": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "configured_image": "grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b",
+      "repo_digests": ["grafana/grafana@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b"],
+      "port_bindings": [{"container_port": "3000/tcp", "host_ip": "127.0.0.1", "host_port": "3000"}]
+    },
+    {
+      "name": "telescan_prometheus",
+      "service": "prometheus",
+      "running": true,
+      "image_id": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "configured_image": "prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0",
+      "repo_digests": ["prom/prometheus@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0"],
+      "port_bindings": [{"container_port": "9090/tcp", "host_ip": "127.0.0.1", "host_port": "9090"}]
+    },
+    {
+      "name": "telescan_loki",
+      "service": "loki",
+      "running": true,
+      "image_id": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "configured_image": "grafana/loki:3.7.6@sha256:efd47c67f9bac88ca29bcf8cb997d9ab29d1848bd0aff579282295542a745952",
+      "repo_digests": ["grafana/loki@sha256:efd47c67f9bac88ca29bcf8cb997d9ab29d1848bd0aff579282295542a745952"],
+      "port_bindings": [{"container_port": "3100/tcp", "host_ip": "127.0.0.1", "host_port": "3100"}]
+    },
+    {
+      "name": "telescan_alloy",
+      "service": "alloy",
+      "running": true,
+      "image_id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "configured_image": "grafana/alloy:v1.18.1@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33",
+      "repo_digests": ["grafana/alloy@sha256:0f4434c92b3e6cdac38bb129b344e1790c246f7b6e2eaffcc16a5fa363240e33"],
+      "port_bindings": []
+    },
+    {
+      "name": "telescan_restricted_ingest",
+      "service": "restricted-ingest",
+      "running": true,
+      "image_id": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "configured_image": "nginx:1.30.4-alpine3.24@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46",
+      "repo_digests": ["nginx@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46"],
+      "port_bindings": [
+        {"container_port": "19090/tcp", "host_ip": "10.78.0.1", "host_port": "19090"},
+        {"container_port": "13100/tcp", "host_ip": "10.78.0.1", "host_port": "13100"}
+      ]
+    }
+  ]
+}

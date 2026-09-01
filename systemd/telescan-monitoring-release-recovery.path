@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for interrupted Telescan monitoring release intent
+
+[Path]
+PathExists=/home/ubuntu/telescan-monitoring/.release-state/intent.json
+Unit=telescan-monitoring-release-recovery.service
+
+[Install]
+WantedBy=multi-user.target
