@@ -23,6 +23,7 @@ expect_rejected grafana-key-prepare bash ops/prepare-grafana-secret-key.sh
 expect_rejected transactional-deploy bash ops/deploy-release-with-rollback.sh
 expect_rejected release-supervisor bash ops/run-release-transaction.sh
 expect_rejected release-recovery-install bash ops/install-release-recovery.sh
+grep -q 'systemctl reset-failed' ops/install-release-recovery.sh
 expect_rejected production-fixture-bypass \
   python3 ops/check-attestation-inventory.py \
     --role monitoring \

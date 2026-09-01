@@ -6,6 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+User=ubuntu
+Group=ubuntu
 ExecCondition=/usr/bin/test -e /home/ubuntu/telescan-monitoring/.release-state/intent.json
 ExecStart=/bin/bash -c 'set -Eeuo pipefail; exec 9>/tmp/telescan-production-deploy.lock; flock --exclusive --timeout 1800 9; exec /home/ubuntu/telescan-monitoring/.release-state/recovery-controller/ops/run-release-transaction.sh --apply --confirm RECOVER_MONITORING_RELEASE --active-root /home/ubuntu/telescan-monitoring --recover-only'
 TimeoutStartSec=70min

@@ -9,6 +9,9 @@ mock_bin="$temporary_root/bin"
 log="$temporary_root/controller.log"
 install -d -m 0700 "$mock_bin"
 
+grep -Fxq 'User=ubuntu' "$unit"
+grep -Fxq 'Group=ubuntu' "$unit"
+
 install -m 0755 /dev/null "$mock_bin/flock"
 printf '%s\n' \
   '#!/usr/bin/env bash' \
