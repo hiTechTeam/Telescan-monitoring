@@ -41,15 +41,15 @@ grep -q 'exec 9>/tmp/telescan-production-deploy.lock' .github/workflows/monitori
 grep -q 'tar --extract --gzip --file=- --directory "$release_root"' \
   .github/workflows/monitoring.yml
 grep -q 'run-release-transaction.sh' .github/workflows/monitoring.yml
-if rg -q 'Upload configuration|\brsync\b' .github/workflows/monitoring.yml; then
+if grep -Eq 'Upload configuration|rsync' .github/workflows/monitoring.yml; then
   echo "Monitoring workflow still mutates active configuration outside its transaction." >&2
   exit 1
 fi
-lock_line="$(rg -n 'flock --exclusive --timeout 1800 9' \
+lock_line="$(grep -n 'flock --exclusive --timeout 1800 9' \
   .github/workflows/monitoring.yml | cut -d: -f1)"
-extract_line="$(rg -n 'tar --extract --gzip --file=- --directory' \
+extract_line="$(grep -n 'tar --extract --gzip --file=- --directory' \
   .github/workflows/monitoring.yml | cut -d: -f1)"
-transaction_line="$(rg -n '"\$release_root/ops/run-release-transaction.sh"' \
+transaction_line="$(grep -n '"\$release_root/ops/run-release-transaction.sh"' \
   .github/workflows/monitoring.yml | cut -d: -f1)"
 if [[ ! "$lock_line" =~ ^[0-9]+$ || ! "$extract_line" =~ ^[0-9]+$ || \
       ! "$transaction_line" =~ ^[0-9]+$ || \
