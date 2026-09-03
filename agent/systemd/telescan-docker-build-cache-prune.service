@@ -11,6 +11,9 @@ User=ubuntu
 Group=ubuntu
 Nice=10
 IOSchedulingClass=idle
+RuntimeDirectory=telescan-docker-gc
+RuntimeDirectoryMode=0700
+Environment=DOCKER_CONFIG=/run/telescan-docker-gc
 NoNewPrivileges=true
 ProtectHome=true
 ProtectSystem=strict

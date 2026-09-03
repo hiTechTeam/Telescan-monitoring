@@ -81,6 +81,8 @@ grep -q 'ReadWritePaths=/run/docker.sock /tmp' \
   agent/systemd/telescan-docker-build-cache-prune.service
 grep -q '^User=ubuntu$' \
   agent/systemd/telescan-docker-build-cache-prune.service
+grep -q '^Environment=DOCKER_CONFIG=/run/telescan-docker-gc$' \
+  agent/systemd/telescan-docker-build-cache-prune.service
 
 bash ops/test-attestation-inventory.sh >/dev/null
 grep -q 'failures.extend(validate_container_bindings(containers, role))' \
