@@ -111,7 +111,7 @@ tests:
       - series: 'telescan_systemd_service_last_exit_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.service"}'
         values: '0 0 0'
     promql_expr_test:
-      - expr: 'telescan:production_problem{check="mongodb_backup_age"}'
+      - expr: 'telescan:production_problem{check="mongodb_backup_age"} > 0'
         eval_time: 1m
         exp_samples: []
 
