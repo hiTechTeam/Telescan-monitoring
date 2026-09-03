@@ -21,6 +21,10 @@ the host and are never committed to Git.
 - A lightweight Alloy agent on each production host exports host metrics,
   Docker logs, expected-container state, systemd timer results, and WireGuard
   handshake timestamps. Application containers are not modified.
+- On the Moscow build host, the agent also runs daily build-cache maintenance.
+  It shares the production deployment lock, skips active recovery transactions,
+  and removes only unused Docker build cache older than 24 hours. Images,
+  containers, and volumes are never pruned by this maintenance job.
 - Grafana reaches Telegram through a domain-restricted HTTPS proxy on the EU
   host because the Telegram Bot API is unreachable from the Yandex network.
 

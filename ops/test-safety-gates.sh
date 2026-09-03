@@ -70,6 +70,15 @@ grep -q 'switch_release "$new_name"' ops/deploy-release-with-rollback.sh
 grep -q 'fsync_directory(root.parent)' ops/release-state.py
 grep -q 'recovery-controller' ops/run-release-transaction.sh
 grep -q 'PathExists=.*/intent.json' systemd/telescan-monitoring-release-recovery.path
+grep -q '"$flock_bin" --nonblock 9' agent/ops/prune-docker-build-cache.sh
+grep -q 'find "$transaction_root" -maxdepth 3 -type f -name active.json' \
+  agent/ops/prune-docker-build-cache.sh
+grep -q 'builder prune --all --force --filter until=24h' \
+  agent/ops/prune-docker-build-cache.sh
+grep -q 'OnUnitActiveSec=24h' \
+  agent/systemd/telescan-docker-build-cache-prune.timer
+grep -q 'ReadWritePaths=/run/docker.sock /tmp' \
+  agent/systemd/telescan-docker-build-cache-prune.service
 
 bash ops/test-attestation-inventory.sh >/dev/null
 grep -q 'failures.extend(validate_container_bindings(containers, role))' \

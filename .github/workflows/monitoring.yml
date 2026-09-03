@@ -24,7 +24,9 @@ jobs:
         run: bash -n ops/*.sh agent/ops/*.sh network/ops/*.sh egress/ops/*.sh grafana/*.sh
 
       - name: Test safety gates
-        run: bash ops/test-safety-gates.sh
+        run: |
+          bash ops/test-safety-gates.sh
+          bash agent/ops/test-prune-docker-build-cache.sh
 
       - name: Test frozen attestation inventory
         run: bash ops/test-attestation-inventory.sh

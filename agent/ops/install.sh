@@ -71,11 +71,15 @@ install -m 0600 "$tmp_environment" "$repo_dir/.env"
 rm -f "$tmp_environment"
 
 install -m 0755 "$repo_dir/ops/collect-host-state.sh" /usr/local/sbin/telescan-monitoring-state
+install -m 0755 "$repo_dir/ops/prune-docker-build-cache.sh" /usr/local/sbin/telescan-docker-build-cache-prune
 install -m 0644 "$repo_dir/systemd/telescan-monitoring-state.service" /etc/systemd/system/telescan-monitoring-state.service
 install -m 0644 "$repo_dir/systemd/telescan-monitoring-state.timer" /etc/systemd/system/telescan-monitoring-state.timer
+install -m 0644 "$repo_dir/systemd/telescan-docker-build-cache-prune.service" /etc/systemd/system/telescan-docker-build-cache-prune.service
+install -m 0644 "$repo_dir/systemd/telescan-docker-build-cache-prune.timer" /etc/systemd/system/telescan-docker-build-cache-prune.timer
 
 systemctl daemon-reload
 systemctl enable --now telescan-monitoring-state.timer
+systemctl enable --now telescan-docker-build-cache-prune.timer
 systemctl start telescan-monitoring-state.service
 
 cd "$repo_dir"

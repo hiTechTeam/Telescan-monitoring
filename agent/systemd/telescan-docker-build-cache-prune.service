@@ -1,0 +1,17 @@
+[Unit]
+Description=Prune stale Telescan Docker build cache
+After=docker.service
+Requires=docker.service
+ConditionPathExists=/etc/default/telescan-monitoring-agent
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/telescan-docker-build-cache-prune
+User=root
+Group=root
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/run/docker.sock /tmp

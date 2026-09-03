@@ -1,0 +1,12 @@
+[Unit]
+Description=Prune stale Telescan Docker build cache daily
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=24h
+AccuracySec=5min
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
