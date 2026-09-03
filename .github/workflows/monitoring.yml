@@ -26,6 +26,7 @@ jobs:
       - name: Test safety gates
         run: |
           bash ops/test-safety-gates.sh
+          bash agent/ops/test-collect-host-state.sh
           bash agent/ops/test-prune-docker-build-cache.sh
 
       - name: Test frozen attestation inventory

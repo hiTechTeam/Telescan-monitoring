@@ -50,7 +50,7 @@
       },
       "gridPos": {"h": 5, "w": 4, "x": 12, "y": 0},
       "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
-      "targets": [{"expr": "(time() - telescan_systemd_service_last_exit_timestamp_seconds{host=\"moscow\",unit=\"telescan-mongodb-backup.service\"}) / 3600", "instant": true, "refId": "A"}],
+      "targets": [{"expr": "(time() - telescan_systemd_timer_last_trigger_timestamp_seconds{host=\"moscow\",unit=\"telescan-mongodb-backup.timer\"}) / 3600", "instant": true, "refId": "A"}],
       "title": "Backup age",
       "type": "stat"
     },

@@ -87,7 +87,7 @@ tests:
   - name: stale backup and state collector are positive
     interval: 30s
     input_series:
-      - series: 'telescan_systemd_service_last_exit_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.service"}'
+      - series: 'telescan_systemd_timer_last_trigger_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.timer"}'
         values: '-108001 -108001 -108001'
       - series: 'telescan_monitoring_state_last_success_timestamp_seconds{host="eu"}'
         values: '-121 -121 -121'
@@ -95,13 +95,25 @@ tests:
       - expr: 'telescan:production_problem{check="mongodb_backup_age"}'
         eval_time: 1m
         exp_samples:
-          - labels: 'telescan:production_problem{check="mongodb_backup_age",host="moscow",unit="telescan-mongodb-backup.service"}'
+          - labels: 'telescan:production_problem{check="mongodb_backup_age",host="moscow",unit="telescan-mongodb-backup.timer"}'
             value: 61
       - expr: 'telescan:production_problem{check="state_collector_age"}'
         eval_time: 1m
         exp_samples:
           - labels: 'telescan:production_problem{check="state_collector_age",host="eu"}'
             value: 1
+
+  - name: fresh timer trigger ignores cleared oneshot exit timestamp
+    interval: 30s
+    input_series:
+      - series: 'telescan_systemd_timer_last_trigger_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.timer"}'
+        values: '0 0 0'
+      - series: 'telescan_systemd_service_last_exit_timestamp_seconds{host="moscow",unit="telescan-mongodb-backup.service"}'
+        values: '0 0 0'
+    promql_expr_test:
+      - expr: 'telescan:production_problem{check="mongodb_backup_age"}'
+        eval_time: 1m
+        exp_samples: []
 
   - name: monitoring data disk missing is positive
     interval: 30s

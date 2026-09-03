@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-config_file=/etc/default/telescan-monitoring-agent
+config_file="${TELESCAN_MONITORING_STATE_CONFIG_FILE:-/etc/default/telescan-monitoring-agent}"
 output_dir=/var/lib/telescan-monitoring-agent/textfile
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run this script as root" >&2
+  exit 1
+fi
+
+if [[ ! "$config_file" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+  echo "Invalid TELESCAN_MONITORING_STATE_CONFIG_FILE." >&2
   exit 1
 fi
 
@@ -103,11 +108,20 @@ done < <(docker ps -a --format '{{.Names}}')
 
   printf '# HELP telescan_systemd_timer_active Whether a monitored systemd timer is active.\n'
   printf '# TYPE telescan_systemd_timer_active gauge\n'
+  printf '# HELP telescan_systemd_timer_last_trigger_timestamp_seconds Last timer trigger time as Unix seconds.\n'
+  printf '# TYPE telescan_systemd_timer_last_trigger_timestamp_seconds gauge\n'
   for unit in ${MONITORED_TIMERS:-}; do
     value=0
     systemctl is-active --quiet "$unit" && value=1
-    printf 'telescan_systemd_timer_active{unit="%s"} %s\n' \
-      "$(escape_label "$unit")" "$value"
+    timestamp="$(systemctl show "$unit" --property=LastTriggerUSec --value 2>/dev/null || true)"
+    epoch=0
+    if [[ -n "$timestamp" && "$timestamp" != n/a ]]; then
+      epoch="$(date --date="$timestamp" +%s 2>/dev/null || printf '0')"
+    fi
+    labels="unit=\"$(escape_label "$unit")\""
+    printf 'telescan_systemd_timer_active{%s} %s\n' "$labels" "$value"
+    printf 'telescan_systemd_timer_last_trigger_timestamp_seconds{%s} %s\n' \
+      "$labels" "$epoch"
   done
 
   printf '# HELP telescan_systemd_service_success Whether the last monitored service result was success.\n'

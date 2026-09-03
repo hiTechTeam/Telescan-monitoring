@@ -36,7 +36,7 @@ groups:
             "check", "systemd_service", "", ""
           )
           or label_replace(
-            time() - telescan_systemd_service_last_exit_timestamp_seconds{unit="telescan-mongodb-backup.service"} - 108000,
+            time() - telescan_systemd_timer_last_trigger_timestamp_seconds{unit="telescan-mongodb-backup.timer"} - 108000,
             "check", "mongodb_backup_age", "", ""
           )
           or label_replace(
