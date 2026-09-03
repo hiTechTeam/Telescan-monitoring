@@ -21,8 +21,8 @@ if [[ "$test_mode" == 1 ]]; then
     *) echo "Unsafe test transaction path" >&2; exit 2 ;;
   esac
 elif [[ "$test_mode" == 0 ]]; then
-  [[ "$(id -u)" -eq 0 ]] || {
-    echo "Docker build-cache maintenance must run as root." >&2
+  [[ "$(id -un)" == ubuntu ]] || {
+    echo "Docker build-cache maintenance must run as the production deploy user." >&2
     exit 1
   }
   config_file=/etc/default/telescan-monitoring-agent

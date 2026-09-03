@@ -7,8 +7,8 @@ ConditionPathExists=/etc/default/telescan-monitoring-agent
 [Service]
 Type=oneshot
 ExecStart=/usr/local/sbin/telescan-docker-build-cache-prune
-User=root
-Group=root
+User=ubuntu
+Group=ubuntu
 Nice=10
 IOSchedulingClass=idle
 NoNewPrivileges=true
